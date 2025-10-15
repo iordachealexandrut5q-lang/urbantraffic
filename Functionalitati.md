@@ -1,8 +1,8 @@
 # Funcționalități pentru tema: Simularea traficului urban – Urban Traffic Simulator
 
-===============================================================================
-                                 MUST HAVE
-===============================================================================
+============================================
+MUST HAVE
+=========================================================
 
 ## I. Infrastructura de bază a orașului
 
@@ -56,9 +56,9 @@
    -> Posibilitatea de a selecta două intersecții și de a vizualiza ruta optimă.
    -> Util pentru analizarea comportamentului sistemului de rutare și testarea conexiunilor.
 
-===============================================================================
-                               NICE TO HAVE
-===============================================================================
+============================================
+                   NICE TO HAVE
+===========================================================
 
 ## I. Extensii de infrastructură și simulare
 
