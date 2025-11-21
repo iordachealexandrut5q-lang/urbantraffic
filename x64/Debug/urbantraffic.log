@@ -1,0 +1,22 @@
+﻿  main.cpp
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(107,74): warning C4244: 'argument': conversion from 'int' to 'T', possible loss of data
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(107,74): warning C4244:         with
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(107,74): warning C4244:         [
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(107,74): warning C4244:             T=float
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(107,74): warning C4244:         ]
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(107,53): warning C4244: 'argument': conversion from 'int' to 'T', possible loss of data
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(107,53): warning C4244:         with
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(107,53): warning C4244:         [
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(107,53): warning C4244:             T=float
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(107,53): warning C4244:         ]
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(137,74): warning C4244: 'argument': conversion from 'int' to 'T', possible loss of data
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(137,74): warning C4244:         with
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(137,74): warning C4244:         [
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(137,74): warning C4244:             T=float
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(137,74): warning C4244:         ]
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(137,53): warning C4244: 'argument': conversion from 'int' to 'T', possible loss of data
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(137,53): warning C4244:         with
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(137,53): warning C4244:         [
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(137,53): warning C4244:             T=float
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(137,53): warning C4244:         ]
+C:\Users\alexior\source\repos\urbantraffic\urbantraffic\main.cpp(380,26): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
