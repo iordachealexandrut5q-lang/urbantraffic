@@ -10,6 +10,8 @@
 #include "pathfinding.hpp"
 #include "car.hpp"
 #include "utils.hpp"
+#include <fstream>
+#include <iomanip>
 
 using namespace std;
 
@@ -20,8 +22,10 @@ int main() {
     const int ROWS = 7, COLS = 15;            // grid size (changeable) - will lag on giant grids - RECOMMENDED 7R,15C
     const int NUM_CARS = 150;                 // number of cars
     const float ROAD_THICKNESS = 25.0f;       // thickness of the roads
-    const float CLICK_TOLERANCE = 10.0f;      //determines how close your click has to be to the target to perform the action (e.g. delete road)
-    const float minSpacing = 30.f;           // pixels minimum following distance for cars
+    const float CLICK_TOLERANCE = 10.0f;      // determines how close your click has to be to the target to perform the action (e.g. delete road)
+    const float minSpacing = 30.f;            // pixels minimum following distance for cars
+    const int minspeed = 80.f;                // car min speed (default 80)
+    const int maxspeed = 150.f;               // car max speed (default 150)
 
     // generate graph & positions
     auto graph = generateCityGrid(ROWS, COLS);
@@ -45,6 +49,9 @@ int main() {
     hudText.setFillColor(sf::Color::White);
     hudText.setPosition(20.f, 15.f);
 
+    bool draggingNode = false;
+    int draggedNodeIndex = -1;
+    sf::Vector2f dragOffset;
 
     // precompute edge pixel lengths
     auto edgeLength = [&](int a, int b)->float {
@@ -76,7 +83,7 @@ int main() {
         car.startNode = s; //node at which the car spawns
         car.endNode = e; //destination node
         car.color = sf::Color((sf::Uint8)randint(50, 255), (sf::Uint8)randint(50, 255), (sf::Uint8)randint(50, 255));
-        car.speed = randfloat(80.f, 150.f); // used for the variation of speeds
+        car.speed = randfloat(minspeed, maxspeed); // used for the variation of speeds
         car.path = dijkstra(graph, car.startNode, car.endNode);
         if (car.path.empty()) {
             car.path = { car.startNode };
@@ -96,6 +103,7 @@ int main() {
     vector<int> previewPath;
 
     while (window.isOpen()) {
+
         float dt = clock.restart().asSeconds();
         sf::Event event;
         while (window.pollEvent(event)) {
@@ -130,6 +138,49 @@ int main() {
                     }
                 }
             }
+
+            // ress 'S' to save map to file
+            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::S) {
+                saveCityToFile(graph, positions, "saves/citymap.txt");
+
+            }
+
+            // Press 'L' to load map from file
+            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::L) {
+                graph = loadCityFromFile("saves/citymap.txt", positions);
+            }
+
+            // Middle-click or Shift+Right-click to drag nodes
+            if (event.type == sf::Event::MouseButtonPressed &&
+                (event.mouseButton.button == sf::Mouse::Middle ||
+                    (event.mouseButton.button == sf::Mouse::Right && sf::Keyboard::isKeyPressed(sf::Keyboard::LShift))))
+            {
+                sf::Vector2f mouse(event.mouseButton.x, event.mouseButton.y);
+                for (int i = 0; i < numNodes; ++i) {
+                    float dx = positions[i].x - mouse.x;
+                    float dy = positions[i].y - mouse.y;
+                    float dist = sqrt(dx * dx + dy * dy);
+                    if (dist < 12.f) { // within clickable radius
+                        draggingNode = true;
+                        draggedNodeIndex = i;
+                        dragOffset = { positions[i].x - mouse.x, positions[i].y - mouse.y };
+                        break;
+                    }
+                }
+            }
+
+            if (event.type == sf::Event::MouseMoved && draggingNode && draggedNodeIndex != -1) {
+                sf::Vector2f mouse(event.mouseMove.x, event.mouseMove.y);
+                positions[draggedNodeIndex].x = mouse.x + dragOffset.x;
+                positions[draggedNodeIndex].y = mouse.y + dragOffset.y;
+            }
+
+            if (event.type == sf::Event::MouseButtonReleased) {
+                draggingNode = false;
+                draggedNodeIndex = -1;
+            }
+
+
 
 
             // right-click: preview path - used for debugging, finds idel path using dijkstra
@@ -432,7 +483,6 @@ int main() {
 
         // draw HUD text on top
         window.draw(hudText);
-
 
         window.display();
     } // main loop
