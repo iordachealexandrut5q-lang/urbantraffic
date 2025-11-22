@@ -2,6 +2,9 @@
 #include <SFML/Graphics.hpp>
 #include <vector>
 #include <utility>
+#include <unordered_map>
+
+#include "road.hpp"
 
 // cars
 struct Car {
@@ -20,3 +23,18 @@ struct Car {
     int currentNode() const { return pathIndex; }
     int nextNode() const { return (pathIndex + 1 < (int)path.size()) ? path[pathIndex + 1] : -1; }
 };
+
+// initialize a set of cars
+std::vector<Car> initCars(int numCars,
+    const std::vector<std::vector<Road>>& graph,
+    const std::vector<Intersection>& positions,
+    int minspeed, int maxspeed);
+
+// update all cars for a simulation tick
+void updateCars(std::vector<Car>& cars,
+    const std::vector<std::vector<Road>>& graph,
+    const std::vector<Intersection>& positions,
+    std::unordered_map<long long, std::vector<std::pair<int, float>>>& edgeOccupants,
+    float dt,
+    float minSpacing,
+    float ROAD_THICKNESS);

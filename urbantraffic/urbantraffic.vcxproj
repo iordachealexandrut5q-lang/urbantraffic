@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="car.cpp" />
     <ClCompile Include="city.cpp" />
     <ClCompile Include="draw.cpp" />
     <ClCompile Include="main.cpp" />
