@@ -1,12 +1,9 @@
 #include "car.hpp"
 #include "utils.hpp"
-#include "pathfinding.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <random>
-
-extern std::mt19937 rng; // from utils.cpp
 
 std::vector<Car> initCars(int numCars,
     const std::vector<std::vector<Road>>& graph,
@@ -16,16 +13,16 @@ std::vector<Car> initCars(int numCars,
     std::vector<Car> cars;
     cars.reserve(numCars);
     for (int i = 0; i < numCars; ++i) {
-        int s = randint(0, numNodes - 1);
+        int s = Utils::randint(0, numNodes - 1);
         int e = s;
-        while (e == s) e = randint(0, numNodes - 1);
+        while (e == s) e = Utils::randint(0, numNodes - 1);
         Car car;
         car.id = i;
         car.startNode = s; //node at which the car spawns
         car.endNode = e; //destination node
-        car.color = sf::Color((sf::Uint8)randint(50, 255), (sf::Uint8)randint(50, 255), (sf::Uint8)randint(50, 255));
-        car.speed = randfloat((float)minspeed, (float)maxspeed); // used for the variation of speeds
-        car.path = dijkstra(graph, car.startNode, car.endNode);
+        car.color = sf::Color((sf::Uint8)Utils::randint(50, 255), (sf::Uint8)Utils::randint(50, 255), (sf::Uint8)Utils::randint(50, 255));
+        car.speed = Utils::randfloat((float)minspeed, (float)maxspeed); // used for the variation of speeds
+        car.path = Utils::dijkstra(graph, car.startNode, car.endNode);
         if (car.path.empty()) {
             car.path = { car.startNode };
         }
@@ -39,8 +36,8 @@ std::vector<Car> initCars(int numCars,
     return cars;
 }
 
-// helper for edge length
-static float edgeLength(const std::vector<Intersection>& positions, int a, int b) {
+// helper for road length
+static float roadLength(const std::vector<Intersection>& positions, int a, int b) {
     sf::Vector2f pa(positions[a].x, positions[a].y), pb(positions[b].x, positions[b].y);
     return std::sqrt((pa.x - pb.x) * (pa.x - pb.x) + (pa.y - pb.y) * (pa.y - pb.y));
 }
@@ -58,14 +55,14 @@ void updateCars(std::vector<Car>& cars,
     // shuffled order
     std::vector<int> order(cars.size());
     for (int i = 0; i < (int)cars.size(); ++i) order[i] = i;
-    std::shuffle(order.begin(), order.end(), rng);
+    std::shuffle(order.begin(), order.end(), Utils::rng);
 
     for (int idx : order) {
         Car& car = cars[idx];
 
         // if path length is 0 or pathIndex beyond, recompute path
         if (car.path.empty()) {
-            car.path = dijkstra(graph, car.pathIndex, car.endNode);
+            car.path = Utils::dijkstra(graph, car.pathIndex, car.endNode);
             car.pathIndex = 0;
             car.onEdge = false;
             car.reservedEdge = { -1,-1 };
@@ -78,7 +75,7 @@ void updateCars(std::vector<Car>& cars,
                 int oldStart = car.startNode;
                 car.startNode = car.endNode;
                 car.endNode = oldStart;
-                car.path = dijkstra(graph, car.path.back(), car.endNode);
+                car.path = Utils::dijkstra(graph, car.path.back(), car.endNode);
                 car.pathIndex = 0;
                 car.progress = 0.f;
                 car.onEdge = false;
@@ -88,11 +85,11 @@ void updateCars(std::vector<Car>& cars,
                 }
             }
             else {
-                car.path = dijkstra(graph, car.pathIndex, car.endNode);
+                car.path = Utils::dijkstra(graph, car.pathIndex, car.endNode);
                 if (car.path.empty()) {
-                    int r = randint(0, numNodes - 1);
+                    int r = Utils::randint(0, numNodes - 1);
                     car.endNode = r == car.startNode ? (r + 1) % numNodes : r;
-                    car.path = dijkstra(graph, car.startNode, car.endNode);
+                    car.path = Utils::dijkstra(graph, car.startNode, car.endNode);
                 }
             }
             continue;
@@ -108,7 +105,7 @@ void updateCars(std::vector<Car>& cars,
             bool edgeActive = false;
             for (auto& r : graph[cur]) if (r.destination == nxt && r.active) { edgeActive = true; break; }
             if (!edgeActive) {
-                std::vector<int> newPath = dijkstra(graph, cur, car.endNode);
+                std::vector<int> newPath = Utils::dijkstra(graph, cur, car.endNode);
                 if (newPath.empty()) {
                     // wait
                     continue;
@@ -123,12 +120,13 @@ void updateCars(std::vector<Car>& cars,
             }
 
             // check directed occupancy for cur->nxt
-            long long k = edgeKey(cur, nxt);
-            float segLen = edgeLength(positions, cur, nxt);
+            long long k = Utils::edgeKey(cur, nxt);
+            float segLen = roadLength(positions, cur, nxt);
 
             bool canEnter = false;
             auto& vec = edgeOccupants[k];
             if (vec.empty()) {
+                // no cars on this edge -> entry allowed
                 canEnter = true;
             }
             else {
@@ -136,12 +134,13 @@ void updateCars(std::vector<Car>& cars,
                 float frontProg = 0.f;
                 for (auto& p : vec) frontProg = std::max(frontProg, p.second);
                 float frontDist = frontProg * segLen;
+                // entry rule: require front-most car to be at least (minSpacing + 1.0f)
+                // away before allowing a new car to enter. This is a blocking rule at the node.
                 if (frontDist >= minSpacing + 1.0f) canEnter = true;
                 else canEnter = false;
             }
 
             if (canEnter) {
-                // add occupant at progress 0
                 vec.push_back({ car.id, 0.f });
                 car.onEdge = true;
                 car.reservedEdge = { cur, nxt };
@@ -149,7 +148,7 @@ void updateCars(std::vector<Car>& cars,
                 car.position = { positions[cur].x, positions[cur].y };
             }
             else {
-                // wait at node
+                // wait at node (blocked) - car does not change its speed here
                 continue;
             }
         } // end try-enter
@@ -164,7 +163,7 @@ void updateCars(std::vector<Car>& cars,
             if (segLen <= 0.001f) {
                 car.position = pb;
                 // remove occupant entry
-                long long k = edgeKey(a, b);
+                long long k = Utils::edgeKey(a, b);
                 auto& vec = edgeOccupants[k];
                 vec.erase(std::remove_if(vec.begin(), vec.end(), [&](const std::pair<int, float>& p) { return p.first == car.id; }), vec.end());
                 if (vec.empty()) edgeOccupants.erase(k);
@@ -176,7 +175,7 @@ void updateCars(std::vector<Car>& cars,
             }
 
             // find this car's record in edgeOccupants[a->b]
-            long long k = edgeKey(a, b);
+            long long k = Utils::edgeKey(a, b);
             auto& vec = edgeOccupants[k];
             auto it = std::find_if(vec.begin(), vec.end(), [&](const std::pair<int, float>& p) { return p.first == car.id; });
             if (it == vec.end()) {
@@ -203,13 +202,12 @@ void updateCars(std::vector<Car>& cars,
             // compute attempted step
             float step = (car.speed * dt) / segLen;
             float targetProg = myProg + step;
-            if (targetProg > allowedMaxProg) targetProg = allowedMaxProg;
+            if (targetProg > allowedMaxProg) targetProg = allowedMaxProg; // braking/stop by clamping
 
             // update progress and position
             it->second = targetProg;
             car.progress = targetProg;
             if (car.progress >= 1.0f - 1e-5f) {
-                // arrive
                 car.position = pb;
                 // remove occupant entry
                 vec.erase(std::remove_if(vec.begin(), vec.end(), [&](const std::pair<int, float>& p) { return p.first == car.id; }), vec.end());

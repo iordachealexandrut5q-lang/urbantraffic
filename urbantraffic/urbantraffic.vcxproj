@@ -21,10 +21,9 @@
   <ItemGroup>
     <ClCompile Include="car.cpp" />
     <ClCompile Include="city.cpp" />
-    <ClCompile Include="draw.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="pathfinding.cpp" />
     <ClCompile Include="road.cpp" />
+    <ClCompile Include="simulation.cpp" />
     <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -34,9 +33,12 @@
     <ClInclude Include="car.hpp" />
     <ClInclude Include="city.hpp" />
     <ClInclude Include="draw.hpp" />
-    <ClInclude Include="pathfinding.hpp" />
     <ClInclude Include="road.hpp" />
+    <ClInclude Include="simulation.hpp" />
     <ClInclude Include="utils.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="saves\citymap.txt" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
