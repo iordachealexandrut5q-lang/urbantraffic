@@ -28,11 +28,11 @@ public:
 
     static long long edgeKey(int a, int b);
 
-    // expose RNG so existing code that used a global rng can still shuffle
+	// random number generator
     static std::mt19937 rng;
 };
 
-// Backwards-compatible free-function wrappers for utilities that were previously global
+// inline implementations
 inline int randint(int a, int b) { return Utils::randint(a, b); }
 inline float randfloat(float a, float b) { return Utils::randfloat(a, b); }
 

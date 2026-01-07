@@ -5,6 +5,7 @@
 #include <iostream>
 #include <algorithm>
 #include <cmath>
+#include <sstream>
 
 Simulation::Simulation(int width, int height,
     int rows, int cols,
@@ -14,22 +15,21 @@ Simulation::Simulation(int width, int height,
     float minSpacing,
     int minSpeed,
     int maxSpeed,
-    float secondsPerHour)
+    float secondsPerHour,
+    float poichance,
+    int busMinSpeed,
+    int busMaxSpeed,
+    bool commuteEnabled)
     : WIDTH(width), HEIGHT(height), ROWS(rows), COLS(cols), NUM_CARS(numCars),
     ROAD_THICKNESS(roadThickness), CLICK_TOLERANCE(clickTolerance), MIN_SPACING(minSpacing),
-    MIN_SPEED(minSpeed), MAX_SPEED(maxSpeed), SECONDS_PER_HOUR(secondsPerHour) {
+    MIN_SPEED(minSpeed), MAX_SPEED(maxSpeed), SECONDS_PER_HOUR(secondsPerHour),
+    poichance(poichance), COMMUTE_ENABLED(commuteEnabled) {
 
     // generate graph & positions
-    //graph = generateCityGrid(ROWS, COLS);
-    //positions = generateGridPositions(ROWS, COLS, WIDTH, HEIGHT);
-    //pois = generatePOIs(ROWS, COLS, 0.05f);
     City c = City::createGrid(ROWS, COLS, WIDTH, HEIGHT, 0.05f);
     graph = std::move(c.graph);
     positions = std::move(c.positions);
     pois = std::move(c.pois);
-
-    // generate POIs (~5% of nodes)
-    //pois = generatePOIs(ROWS, COLS, 0.05f);
 
     // load font
     if (!font.loadFromFile("arial.ttf")) {
@@ -40,10 +40,13 @@ Simulation::Simulation(int width, int height,
     hudText.setFillColor(sf::Color::White);
     hudText.setPosition(20.f, 15.f);
 
+    // set initial speed limit to MAX_SPEED
+    speedLimit = MAX_SPEED;
+
     // initialize cars
-    cars = Car::initCars(NUM_CARS, graph, positions, MIN_SPEED, MAX_SPEED);
-    // initialize a few buses
-    buses = Bus::initBuses(std::max(1, NUM_CARS / 10), graph, positions, MIN_SPEED / 2, MAX_SPEED / 2, NUM_CARS, 3);
+    cars = Car::initCars(NUM_CARS, graph, positions, MIN_SPEED, MAX_SPEED, COMMUTE_ENABLED);
+    // initialize a few buses using provided ranges
+    buses = Bus::initBuses(std::max(1, NUM_CARS / 10), graph, positions, busMinSpeed, busMaxSpeed, NUM_CARS, 3);
 }
 
 int Simulation::run() {
@@ -66,6 +69,10 @@ int Simulation::run() {
     int draggedNodeIndex = -1; // index of dragged node
     sf::Vector2f dragOffset; // offset from mouse to node center
 
+    // input mode for setting speed limit
+    bool enteringSpeed = false;
+    std::string speedInput;
+
     while (window.isOpen()) {
         float dt = clock.restart().asSeconds();
 
@@ -75,14 +82,54 @@ int Simulation::run() {
             // event loop
             if (event.type == sf::Event::Closed) window.close();
 
+            // text entry when setting speed
+            if (enteringSpeed) {
+                if (event.type == sf::Event::TextEntered) {
+                    if (event.text.unicode >= '0' && event.text.unicode <= '9') {
+                        speedInput.push_back(static_cast<char>(event.text.unicode));
+                    }
+                    else if (event.text.unicode == '\b' && !speedInput.empty()) { // backspace
+                        speedInput.pop_back();
+                    }
+                    else if (event.text.unicode == '\r' || event.text.unicode == '\n') { // enter commit
+                        if (!speedInput.empty()) {
+                            try {
+                                int newLimit = std::stoi(speedInput);
+                                if (newLimit > 0) {
+                                    speedLimit = newLimit;
+                                    // clamp car desired speeds
+                                    for (auto& car : cars) {
+                                        if (car.speed > (float)speedLimit) car.speed = (float)speedLimit;
+                                        if (car.velocity > (float)speedLimit) car.velocity = (float)speedLimit;
+                                    }
+                                    // clamp bus desired speeds
+                                    for (auto& bus : buses) {
+                                        if (bus.speed > (float)speedLimit) bus.speed = (float)speedLimit;
+                                        if (bus.velocity > (float)speedLimit) bus.velocity = (float)speedLimit;
+                                    }
+                                    std::cout << "Speed limit set to " << speedLimit << "\n";
+                                }
+                            } catch (...) { }
+                        }
+                        enteringSpeed = false;
+                        speedInput.clear();
+                    }
+                    else if (event.text.unicode == 27) { // ESC cancel
+                        enteringSpeed = false;
+                        speedInput.clear();
+                    }
+                }
+                // while entering, skip other event handling
+                continue;
+            }
+
             // left-click: toggle road
             if (event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
                 sf::Vector2f mouse(event.mouseButton.x, event.mouseButton.y);
                 int numNodes = ROWS * COLS;
                 for (int i = 0; i < numNodes; ++i) {
                     for (auto& r : graph[i]) {
-                        int j = r.destination;
-                        // allow toggling even if road is currently inactive so clicking restores it
+                        int j = r.destination; 
                         if (j > i) {
                             sf::Vector2f a(positions[i].x, positions[i].y), b(positions[j].x, positions[j].y);
                             if (Utils::distanceToLine(mouse, a, b) < CLICK_TOLERANCE) {
@@ -91,7 +138,6 @@ int Simulation::run() {
                                 for (auto& rr : graph[j]) if (rr.destination == i) rr.active = !currentlyActive;
                                 if (currentlyActive) {
                                     std::cout << "Deleted road: " << i << " <-> " << j << "\n";
-                                    // remove any occupants on that edge
                                     edgeOccupants.erase(Utils::edgeKey(i, j));
                                     edgeOccupants.erase(Utils::edgeKey(j, i));
                                 }
@@ -104,26 +150,33 @@ int Simulation::run() {
                 }
             }
 
-            // save
+			// save press S
             if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::S) {
                 Utils::saveCityToFile(graph, positions, pois, "saves/citymap.txt");
             }
 
-            // load
+			// load press L
             if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::L) {
                 graph = Utils::loadCityFromFile("saves/citymap.txt", positions, pois);
+            }
+
+            // press W to enter speed limit
+            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::W) {
+                enteringSpeed = true;
+                speedInput.clear();
+                std::cout << "Enter new speed limit: " << std::flush;
             }
 
             // drag nodes
             if (event.type == sf::Event::MouseButtonPressed &&
                 (event.mouseButton.button == sf::Mouse::Middle ||
-                    (event.mouseButton.button == sf::Mouse::Right && sf::Keyboard::isKeyPressed(sf::Keyboard::LShift)))) {
-                sf::Vector2f mouse(event.mouseButton.x, event.mouseButton.y);
-                int numNodes = ROWS * COLS;
+                    (event.mouseButton.button == sf::Mouse::Right && sf::Keyboard::isKeyPressed(sf::Keyboard::LShift)))) { 
+                sf::Vector2f mouse(event.mouseButton.x, event.mouseButton.y); 
+                int numNodes = ROWS * COLS; 
                 for (int i = 0; i < numNodes; ++i) { // check if mouse is near node
                     float dx = positions[i].x - mouse.x;
                     float dy = positions[i].y - mouse.y;
-                    float dist = std::sqrt(dx * dx + dy * dy);
+					float dist = std::sqrt(dx * dx + dy * dy); // distance to node
                     if (dist < 12.f) {
                         draggingNode = true;
                         draggedNodeIndex = i;
@@ -171,7 +224,7 @@ int Simulation::run() {
         }
 
         // update cars (pass POIs and chance)
-        Car::update(cars, graph, positions, edgeOccupants, dt, MIN_SPACING, ROAD_THICKNESS, pois, poichance);
+        Car::update(cars, graph, positions, edgeOccupants, dt, MIN_SPACING, ROAD_THICKNESS, pois, poichance, COMMUTE_ENABLED, simTime);
         // update buses
         Bus::update(buses, graph, positions, edgeOccupants, dt, MIN_SPACING, ROAD_THICKNESS);
 
@@ -186,11 +239,14 @@ int Simulation::run() {
         int minute = static_cast<int>((simTime - hour) * 60.f); // convert fractional hour to minutes
         char buf[16];
         snprintf(buf, sizeof(buf), "%02d:%02d", hour, minute); // format time as HH:MM
-        hudText.setString(buf); // update HUD text
+        // show speed limit in HUD
+        std::ostringstream oss;
+        oss << buf << "  |  SpeedLimit: " << speedLimit;
+        hudText.setString(oss.str()); // update HUD text
 
         window.clear(sf::Color(230, 230, 230)); // light gray background
 
-        int numNodes = ROWS * COLS;
+		int numNodes = ROWS * COLS; // total nodes
         // draw roads
         for (int i = 0; i < numNodes; ++i) {
             for (auto& r : graph[i]) {
@@ -208,7 +264,7 @@ int Simulation::run() {
             int a = (int)(key >> 32); // source node
             int b = (int)(key & 0xFFFFFFFF); // destination node
             int carCount = entry.second.size(); // number of cars on this edge
-            float t = std::min(1.f, carCount / 10.f); // traffic intensity (capped at 10 cars)
+			float t = std::min(1.f, carCount / 10.f); // traffic intensity out of 10 cars
             sf::Color roadColor(
                 (sf::Uint8)(100 + 155 * t),
                 (sf::Uint8)(100 * (1.f - t)),

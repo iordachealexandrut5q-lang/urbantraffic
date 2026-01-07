@@ -1,12 +1,45 @@
 #pragma once
+
+#include <vector>
+#include <string>
+#include "road.hpp"
+#include <SFML/Graphics.hpp>
 #include <random>
 
-// for random
-extern std::mt19937 rng;
-int randint(int a, int b);
-float randfloat(float a, float b);
+class Utils {
+public:
+    static int randint(int a, int b);
+    static float randfloat(float a, float b);
 
-// integer key
-inline long long edgeKey(int a, int b) {
-    return ((long long)a << 32) | (unsigned int)b;
+    static std::vector<std::vector<Road>> loadCityFromFile(const std::string& filename,
+        std::vector<Intersection>& positions);
+
+    static void saveCityToFile(const std::vector<std::vector<Road>>& graph,
+        const std::vector<Intersection>& positions,
+        const std::string& filename);
+
+    static std::vector<int> dijkstra(const std::vector<std::vector<Road>>& graph, int start, int goal);
+
+    static void drawRoad(sf::RenderWindow& window, sf::Vector2f p1, sf::Vector2f p2, float thickness, sf::Color color);
+
+    static float distanceToLine(sf::Vector2f p, sf::Vector2f a, sf::Vector2f b);
+
+    static long long edgeKey(int a, int b);
+
+    // expose RNG so existing code that used a global rng can still shuffle
+    static std::mt19937 rng;
+};
+
+// Backwards-compatible free-function wrappers for utilities that were previously global
+inline int randint(int a, int b) { return Utils::randint(a, b); }
+inline float randfloat(float a, float b) { return Utils::randfloat(a, b); }
+
+inline std::vector<std::vector<Road>> loadCityFromFile(const std::string& filename, std::vector<Intersection>& positions) {
+    return Utils::loadCityFromFile(filename, positions);
 }
+
+inline void saveCityToFile(const std::vector<std::vector<Road>>& graph, const std::vector<Intersection>& positions, const std::string& filename) {
+    Utils::saveCityToFile(graph, positions, filename);
+}
+
+inline long long edgeKey(int a, int b) { return Utils::edgeKey(a, b); }

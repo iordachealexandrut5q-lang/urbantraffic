@@ -9,6 +9,7 @@
 
 std::mt19937 Utils::rng((unsigned)std::random_device{}());
 
+
 int Utils::randint(int a, int b) {
     std::uniform_int_distribution<int> d(a, b);
     return d(rng);
@@ -18,34 +19,35 @@ float Utils::randfloat(float a, float b) {
     std::uniform_real_distribution<float> d(a, b);
     return d(rng);
 }
-
+// generate a unique key for an edge (a,b)
 long long Utils::edgeKey(int a, int b) {
     return (static_cast<long long>(a) << 32) | static_cast<unsigned int>(b);
 }
 
+// loads a city map from a file
 std::vector<std::vector<Road>> Utils::loadCityFromFile(const std::string& filename,
     std::vector<Intersection>& positions,
     std::vector<int>& pois) {
-    std::ifstream in(filename);
+	std::ifstream in(filename); // open file for reading - will be citymap.txt
     if (!in.is_open()) {
-        std::cerr << "Failed to open " << filename << "\n";
+        std::cerr << "Failed to open " << filename << "\n"; 
         return {};
     }
 
-    std::vector<std::vector<Road>> graph;
-    positions.clear();
-    pois.clear();
+    std::vector<std::vector<Road>> graph; 
+    positions.clear(); 
+    pois.clear(); 
 
-    std::string token;
+    std::string token; 
     while (in >> token) {
-        if (token == "NODE") {
+        if (token == "NODE") { 
             int id;
-            in >> id;
-            std::string tmp;
-            float x, y;
-            in >> tmp >> x >> tmp >> y;
-            if (id >= (int)positions.size()) positions.resize(id + 1);
-            positions[id] = { x, y };
+			in >> id; // read node id
+            std::string tmp; 
+			float x, y; // read coordinates
+            in >> tmp >> x >> tmp >> y; 
+            if (id >= (int)positions.size()) positions.resize(id + 1); 
+			positions[id] = { x, y }; // store intersection
         }
         else if (token == "C:") {
             std::string n1, n2, dash;
@@ -55,8 +57,8 @@ std::vector<std::vector<Road>> Utils::loadCityFromFile(const std::string& filena
             graph[a].push_back({ b, 1.0, true });
             graph[b].push_back({ a, 1.0, true });
         }
-        else if (token == "POI") {
-            int id; in >> id; pois.push_back(id);
+        else if (token == "POI") { 
+			int id; in >> id; pois.push_back(id); // read POI id
         }
     }
 
@@ -103,7 +105,8 @@ void Utils::saveCityToFile(const std::vector<std::vector<Road>>& graph,
     out.close();
     std::cout << "Map successfully saved to " << filename << "\n";
 }
-
+// Dijkstra's algorithm to find shortest path from start to goal
+// modified for the purpose of urban traffic simulation
 std::vector<int> Utils::dijkstra(const std::vector<std::vector<Road>>& graph, int start, int goal) {
     int n = (int)graph.size();
     std::vector<double> dist(n, std::numeric_limits<double>::infinity());
@@ -133,23 +136,24 @@ std::vector<int> Utils::dijkstra(const std::vector<std::vector<Road>>& graph, in
             }
         }
     }
-
+	// reconstruct path
     std::vector<int> path;
     if (goal < 0 || goal >= n) return path;
     if (prev[goal] == -1 && start != goal) {
         if (start == goal) { path.push_back(start); return path; }
     }
-    int at = goal;
-    while (at != -1) {
+	int at = goal; // start from goal
+	while (at != -1) { // backtrack to start
         path.push_back(at);
         at = prev[at];
     }
-    std::reverse(path.begin(), path.end());
-    if (path.size() == 1 && path[0] != start) path.clear();
-    return path;
+	std::reverse(path.begin(), path.end()); // reverse to get correct order
+    if (path.size() == 1 && path[0] != start) path.clear(); 
+    return path; 
 }
 
-void Utils::drawRoad(sf::RenderWindow& window, sf::Vector2f p1, sf::Vector2f p2, float thickness, sf::Color color) {
+// draws a road as a rectangle between two points
+void Utils::drawRoad(sf::RenderWindow& window, sf::Vector2f p1, sf::Vector2f p2, float thickness, sf::Color color) { 
     sf::Vector2f direction = p2 - p1;
     float length = std::sqrt(direction.x * direction.x + direction.y * direction.y);
     float angle = std::atan2(direction.y, direction.x) * 180.0f / 3.14159265f;
@@ -163,21 +167,22 @@ void Utils::drawRoad(sf::RenderWindow& window, sf::Vector2f p1, sf::Vector2f p2,
 }
 
 float Utils::distanceToLine(sf::Vector2f p, sf::Vector2f a, sf::Vector2f b) {
-    float A = p.x - a.x;
-    float B = p.y - a.y;
+	float A = p.x - a.x; 
+    float B = p.y - a.y; 
     float C = b.x - a.x;
     float D = b.y - a.y;
+	// dot product of AP and AB
 
-    float dot = A * C + B * D;
-    float len_sq = C * C + D * D;
-    float param = (len_sq != 0) ? (dot / len_sq) : -1;
+	float dot = A * C + B * D; // length squared of AB
+	float len_sq = C * C + D * D; // parameter along line
+    float param = (len_sq != 0) ? (dot / len_sq) : -1; 
 
-    float xx, yy;
-    if (param < 0) { xx = a.x; yy = a.y; }
+    float xx, yy; 
+    if (param < 0) { xx = a.x; yy = a.y; } 
     else if (param > 1) { xx = b.x; yy = b.y; }
     else { xx = a.x + param * C; yy = a.y + param * D; }
 
     float dx = p.x - xx;
     float dy = p.y - yy;
-    return std::sqrt(dx * dx + dy * dy);
+	return std::sqrt(dx * dx + dy * dy); // return distance
 }

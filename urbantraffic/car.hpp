@@ -7,9 +7,6 @@
 #include "road.hpp"
 #include "edgeoccupant.hpp"
 
-// EdgeOccupant represents a vehicle occupying an edge (directed road segment).
-// Defined in its own header `edgeoccupant.hpp`.
-
 // cars
 class Car {
 public:
@@ -20,7 +17,7 @@ public:
     std::vector<int> path;
     int pathIndex = 0;
     float progress = 0.f;
-    float speed = 120.f; // desired cruise speed (pixels/sec)
+	float speed = 120.f; // desired speed (pixels/sec)
     float velocity = 0.f; // current speed (pixels/sec) - for smooth acceleration
     float accel = 40.f;   // max acceleration (pixels/sec^2)
     float braking = 120.f; // max deceleration (pixels/sec^2)
@@ -32,17 +29,23 @@ public:
 
     bool divertedToPOI = false; // whether currently heading to POI instead of original end
 
+    // commuter-related fields
+    bool isCommuter = false; // true for the ~80% of cars that follow the commute schedule
+    int homeNode = -1; // original home node
+    int workNode = -1; // original work node
+    enum CommuteState { NONE = 0, AT_HOME, TO_WORK, AT_WORK, TO_HOME } commuteState = NONE;
+
     int currentNode() const { return pathIndex; }
     int nextNode() const { return (pathIndex + 1 < (int)path.size()) ? path[pathIndex + 1] : -1; }
 
-    // initialize a set of cars
+    // initialize a set of cars; enableCommute controls whether commuter behavior is assigned
     static std::vector<Car> initCars(int numCars,
         const std::vector<std::vector<Road>>& graph,
         const std::vector<Intersection>& positions,
-        int minspeed, int maxspeed);
+        int minspeed, int maxspeed,
+        bool enableCommute);
 
     // update all cars for a simulation tick
-    // update all cars for a simulation tick (original name)
     static void update(std::vector<Car>& cars,
         const std::vector<std::vector<Road>>& graph,
         const std::vector<Intersection>& positions,
@@ -51,9 +54,11 @@ public:
         float minSpacing,
         float ROAD_THICKNESS,
         const std::vector<int>& pois,
-        float poichance);
+        float poichance,
+        bool commuteEnabled,
+        float simTime);
 
-    // alternate name to improve clarity and match other code variants
+	
     static void updateCars(std::vector<Car>& cars,
         const std::vector<std::vector<Road>>& graph,
         const std::vector<Intersection>& positions,
@@ -62,7 +67,9 @@ public:
         float minSpacing,
         float ROAD_THICKNESS,
         const std::vector<int>& pois,
-        float poichance);
+        float poichance,
+        bool commuteEnabled,
+        float simTime);
 
 private:
     static float roadLength(const std::vector<Intersection>& positions, int a, int b);
@@ -74,7 +81,7 @@ public:
     std::vector<int> stops; // sequence of stops the bus must visit
     int stopIndex = 0; // current target stop index in `stops`
 
-    // initialize buses; startId is used so bus ids don't collide with car ids
+	// initialize a set of buses
     static std::vector<Bus> initBuses(int numBuses,
         const std::vector<std::vector<Road>>& graph,
         const std::vector<Intersection>& positions,
@@ -82,8 +89,7 @@ public:
         int startId = 0,
         int stopsPerBus = 3);
 
-    // update buses each tick (similar to Car::updateCars but advances through multiple stops)
-    // update buses each tick (similar to Car::update but advances through multiple stops)
+	// update all buses for a simulation tick
     static void update(std::vector<Bus>& buses,
         const std::vector<std::vector<Road>>& graph,
         const std::vector<Intersection>& positions,
@@ -92,7 +98,6 @@ public:
         float minSpacing,
         float ROAD_THICKNESS);
 
-    // alternate name to improve clarity and match other code variants
     static void updateBuses(std::vector<Bus>& buses,
         const std::vector<std::vector<Road>>& graph,
         const std::vector<Intersection>& positions,

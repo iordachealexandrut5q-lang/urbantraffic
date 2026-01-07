@@ -11,6 +11,7 @@ class City {
     City() = default;
 
     // create a city grid with positions and POIs
+	// poiFraction determines fraction of nodes that are POIs
     static City createGrid(int rows, int cols, int width, int height,
                            float poiFraction = 0.05f);
 

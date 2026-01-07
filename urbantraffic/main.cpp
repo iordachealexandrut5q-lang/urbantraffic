@@ -23,8 +23,12 @@ int main() {
     const float minSpacing = 30.f;            // pixels minimum following distance for cars
     const int minspeed = 80.f;                // car min speed (default 80)
     const int maxspeed = 150.f;               // car max speed (default 150)
-	const float secondsPerHour = 5.f;          // simulation speed: how many real seconds correspond to one in-sim hour
+    const float secondsPerHour = 5.f;          // simulation speed: how many real seconds correspond to one in-sim hour
+    const float POI_CHANCE = 0.095f; // ~9.5% chance
+    const int BUS_MIN_SPEED = minspeed / 2;
+    const int BUS_MAX_SPEED = maxspeed / 2;
+	bool commuteEnabled = false; // works better with more seconds per hour, hard to display for testing
 
-    Simulation sim(WIDTH, HEIGHT, ROWS, COLS, NUM_CARS, ROAD_THICKNESS, CLICK_TOLERANCE, minSpacing, minspeed, maxspeed, secondsPerHour);
+    Simulation sim(WIDTH, HEIGHT, ROWS, COLS, NUM_CARS, ROAD_THICKNESS, CLICK_TOLERANCE, minSpacing, minspeed, maxspeed, secondsPerHour, POI_CHANCE, BUS_MIN_SPEED, BUS_MAX_SPEED, commuteEnabled);
     return sim.run();
 }

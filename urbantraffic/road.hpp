@@ -7,12 +7,13 @@ public:
     int destination;
     double distance;
     bool active = true;
-    int limit; // speed limit currently unused
+    int limit;
 
     // remove a road (both directions)
     static void removeRoad(std::vector<std::vector<Road>>& graph, int i, int j);
 
     // remove one direction of the road, creating a one-way road
+	// not used currently
     static void oneway(std::vector<std::vector<Road>>& graph, int i, int j);
 };
 

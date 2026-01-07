@@ -8,7 +8,8 @@
 std::vector<Car> Car::initCars(int numCars,
     const std::vector<std::vector<Road>>& graph,
     const std::vector<Intersection>& positions,
-    int minspeed, int maxspeed) {
+    int minspeed, int maxspeed,
+    bool enableCommute) {
     int numNodes = (int)positions.size();
     std::vector<Car> cars;
     cars.reserve(numCars);
@@ -35,6 +36,27 @@ std::vector<Car> Car::initCars(int numCars,
         car.position = { positions[car.startNode].x, positions[car.startNode].y };
         // choose a random lane among the two rightmost lanes only (lanes 0 and 1)
         car.lane = Utils::randint(0, 1);
+
+        // commuter assignment: ~80% become commuters with home/work if enabled
+        if (enableCommute) {
+            float r = Utils::randfloat(0.f, 1.f);
+            if (r <= 0.8f) {
+                car.isCommuter = true;
+                car.homeNode = car.startNode;
+				// pick a work node different from home
+                int w = car.homeNode;
+                while (w == car.homeNode) w = Utils::randint(0, numNodes - 1);
+                car.workNode = w;
+                // start day at home
+                car.commuteState = Car::AT_HOME;
+				// set destination to work for when commute starts
+                car.endNode = car.workNode;
+                car.originalEnd = car.endNode;
+                car.path = Utils::dijkstra(graph, car.startNode, car.endNode);
+                if (car.path.empty()) car.path = { car.startNode };
+            }
+        }
+
         cars.push_back(car);
     }
     return cars;
@@ -54,7 +76,9 @@ void Car::update(std::vector<Car>& cars,
     float minSpacing,
     float ROAD_THICKNESS,
     const std::vector<int>& pois,
-    float poichance) {
+    float poichance,
+    bool commuteEnabled,
+    float simTime) {
 
     const int NUM_LANES = 4;
     const int CAR_MIN_LANE = 0; // rightmost lanes are 0 and 1
@@ -72,8 +96,43 @@ void Car::update(std::vector<Car>& cars,
     for (int i = 0; i < (int)cars.size(); ++i) order[i] = i;
     std::shuffle(order.begin(), order.end(), Utils::rng);
 
+    // define commute schedule hours
+    const float DEPART_HOUR = 6.0f; // 6:00 AM
+    const float RETURN_HOUR = 17.0f; // 5:00 PM
+
     for (int idx : order) {
         Car& car = cars[idx];
+
+        // handle commuter schedule state transitions if commute feature enabled
+        if (commuteEnabled && car.isCommuter) {
+            // if at home and time is depart hour or later (but before return), start heading to work
+            if (car.commuteState == Car::AT_HOME) {
+                if (simTime >= DEPART_HOUR && simTime < RETURN_HOUR) {
+                    // start trip to work
+                    car.endNode = car.workNode;
+                    car.path = Utils::dijkstra(graph, car.startNode, car.endNode);
+                    car.pathIndex = 0;
+                    car.onEdge = false;
+                    car.reservedEdge = { -1, -1 };
+                    car.progress = 0.f;
+                    car.commuteState = Car::TO_WORK;
+                    if (car.path.empty()) { car.path = { car.startNode }; }
+                }
+            }
+            // if at work and time is return hour or later, start heading home
+            else if (car.commuteState == Car::AT_WORK) {
+                if (simTime >= RETURN_HOUR || simTime < DEPART_HOUR) { // allow wrap-around midnight
+                    car.endNode = car.homeNode;
+                    car.path = Utils::dijkstra(graph, car.startNode, car.endNode);
+                    car.pathIndex = 0;
+                    car.onEdge = false;
+                    car.reservedEdge = { -1, -1 };
+                    car.progress = 0.f;
+                    car.commuteState = Car::TO_HOME;
+                    if (car.path.empty()) { car.path = { car.startNode }; }
+                }
+            }
+        }
 
         // if path length is 0 or pathIndex beyond, recompute path
         if (car.path.empty()) {
@@ -87,8 +146,39 @@ void Car::update(std::vector<Car>& cars,
         if (car.pathIndex >= (int)car.path.size() - 1) {
             // reached end
             if (car.path.size() >= 1 && car.path.back() == car.endNode) {
+                // For commuters, when they reach their destination update state and enforce waiting until schedule
+                if (commuteEnabled && car.isCommuter) {
+                    if (car.commuteState == Car::TO_WORK) {
+                        // arrived at work - switch to AT_WORK and stay until RETURN_HOUR
+                        car.startNode = car.endNode;
+                        car.path = { car.startNode };
+                        car.pathIndex = 0;
+                        car.progress = 0.f;
+                        car.onEdge = false;
+                        car.reservedEdge = { -1,-1 };
+                        car.commuteState = Car::AT_WORK;
+                        // set position to node
+                        car.position = { positions[car.startNode].x, positions[car.startNode].y };
+                        car.velocity = 0.f;
+                        continue; // skip further movement
+                    }
+                    else if (car.commuteState == Car::TO_HOME) {
+                        // arrived at home - switch to AT_HOME and stay until next day DEPART_HOUR
+                        car.startNode = car.endNode;
+                        car.path = { car.startNode };
+                        car.pathIndex = 0;
+                        car.progress = 0.f;
+                        car.onEdge = false;
+                        car.reservedEdge = { -1,-1 };
+                        car.commuteState = Car::AT_HOME;
+                        car.position = { positions[car.startNode].x, positions[car.startNode].y };
+                        car.velocity = 0.f;
+                        continue;
+                    }
+                }
+
+                // Non-commuter or normal behavior: existing POI diversion logic and swap start/end
                 // before swapping start/end, check POI diversion chance
-                // only consider diversion if we have POIs and not already diverted
                 if (!pois.empty() && !car.divertedToPOI) {
                     float r = Utils::randfloat(0.f, 1.f);
                     if (r < poichance) {
@@ -112,7 +202,7 @@ void Car::update(std::vector<Car>& cars,
                 int oldStart = car.startNode;
                 car.startNode = car.endNode;
                 car.endNode = oldStart;
-                // if we had been diverted to POI, restore to original end after reaching POI
+				// if was diverted to POI, restore original end
                 if (car.divertedToPOI) {
                     car.divertedToPOI = false;
                     car.endNode = car.originalEnd;
@@ -138,13 +228,33 @@ void Car::update(std::vector<Car>& cars,
             continue;
         }
 
+		// handle commuter waiting at home/work
+        if (commuteEnabled && car.isCommuter) {
+            if (car.commuteState == Car::AT_HOME) {
+                if (!(simTime >= DEPART_HOUR && simTime < RETURN_HOUR)) {
+					// if it's not yet depart hour, stay at home
+                    car.velocity = 0.f;
+                    car.position = { positions[car.startNode].x, positions[car.startNode].y };
+                    continue;
+                }
+            }
+            if (car.commuteState == Car::AT_WORK) {
+                // if it's not yet return hour, stay at work
+                if (!(simTime >= RETURN_HOUR || simTime < DEPART_HOUR)) {
+                    car.velocity = 0.f;
+                    car.position = { positions[car.startNode].x, positions[car.startNode].y };
+                    continue;
+                }
+            }
+        }
+
         // if not on edge, attempt to enter directed edge cur -> nxt
         if (!car.onEdge) {
             int cur = car.path[car.pathIndex];
             int nxt = car.nextNode();
             if (nxt == -1) continue;
 
-            // check edge still active; if not, recompute path from current node
+			// check if edge cur->nxt is active
             bool edgeActive = false;
             for (auto& r : graph[cur]) if (r.destination == nxt && r.active) { edgeActive = true; break; }
             if (!edgeActive) {
@@ -171,7 +281,7 @@ void Car::update(std::vector<Car>& cars,
             // attempt to find a lane with sufficient space near start
             int chosenLane = -1;
             float requiredDist = minSpacing + 5.0f; // small buffer for entering
-            // for each lane, compute front-most occupant progress in that lane
+			// check lanes from rightmost to leftmost
             for (int lane = CAR_MIN_LANE; lane <= CAR_MAX_LANE; ++lane) {
                 float frontProg = -1.f; // -1 means empty
                 for (auto& p : vec) {
@@ -217,14 +327,14 @@ void Car::update(std::vector<Car>& cars,
             float segLen = std::sqrt((pa.x - pb.x) * (pa.x - pb.x) + (pa.y - pb.y) * (pa.y - pb.y));
             if (segLen <= 0.001f) {
                 car.position = pb;
-                // remove occupant entry
+				// remove from edgeOccupants
                 long long k = Utils::edgeKey(a, b);
-                auto& vec = edgeOccupants[k];
-                vec.erase(std::remove_if(vec.begin(), vec.end(), [&](const EdgeOccupant& p) { return p.id == car.id; }), vec.end());
-                if (vec.empty()) edgeOccupants.erase(k);
-                car.onEdge = false;
-                car.reservedEdge = { -1,-1 };
-                car.pathIndex++;
+                auto& vec = edgeOccupants[k]; 
+                vec.erase(std::remove_if(vec.begin(), vec.end(), [&](const EdgeOccupant& p) { return p.id == car.id; }), vec.end()); 
+				if (vec.empty()) edgeOccupants.erase(k); // clean up if empty
+                car.onEdge = false; 
+                car.reservedEdge = { -1,-1 }; 
+				car.pathIndex++; // advance to next node
                 car.progress = 0.f;
                 continue;
             }
@@ -234,7 +344,7 @@ void Car::update(std::vector<Car>& cars,
             auto& vec = edgeOccupants[k];
             auto it = std::find_if(vec.begin(), vec.end(), [&](const EdgeOccupant& p) { return p.id == car.id; });
             if (it == vec.end()) {
-                // should not happen; reinsert
+				// should not happen, but if so, re-add
                 vec.push_back({ car.id, car.progress, car.lane });
                 it = std::find_if(vec.begin(), vec.end(), [&](const EdgeOccupant& p) { return p.id == car.id; });
             }
@@ -246,16 +356,16 @@ void Car::update(std::vector<Car>& cars,
             for (auto& p : vec) {
                 if (p.id == car.id) continue;
                 if (p.lane != it->lane) continue; // only consider same lane
-                if (p.progress > myProg) {
-                    if (p.progress < nextAheadProg) {
-                        nextAheadProg = p.progress;
+				if (p.progress > myProg) { // ahead of car
+                    if (p.progress < nextAheadProg) { 
+                        nextAheadProg = p.progress; 
                         aheadId = p.id;
                     }
                 }
             }
 
             // lane change logic: if blocked by slower car ahead and adjacent lane offers more gap, change lane
-            // try right then left within allowed car lanes (0..1)
+			// note: only attempt lane change if there is a car ahead
             if (nextAheadProg <= 1.0f) {
                 // estimate leader velocity using idToIndex map
                 float v_lead = 0.f;
@@ -270,7 +380,7 @@ void Car::update(std::vector<Car>& cars,
                     for (int t = 0; t < 2; ++t) {
                         int d = tryDirs[t];
                         int targetLane = car.lane + d;
-                        // restrict target lanes to car-allowed lanes
+						// check lane bounds
                         if (targetLane < CAR_MIN_LANE || targetLane > CAR_MAX_LANE) continue;
                         // check adjacent lane occupancy near our position to ensure safe gap
                         bool safe = true;
@@ -303,10 +413,10 @@ void Car::update(std::vector<Car>& cars,
                 }
             }
 
-            // compute desired gap using a simple Intelligent-Driver-like model
-            float t_headway = 1.0f; // seconds desired headway
-            float v = car.velocity; // current speed
-            float v_lead = v; // assume equal if no lead
+			// compute desired gap to car ahead
+            float t_headway = 1.0f; 
+            float v = car.velocity;
+			float v_lead = v; // assume same speed if no leader
             float gap = minSpacing;
             if (nextAheadProg <= 1.0f) {
                 v_lead = 0.f; // fallback
@@ -325,7 +435,7 @@ void Car::update(std::vector<Car>& cars,
                 allowedMaxProg = std::max(0.0f, allowedDist / segLen);
             }
 
-            // desired velocity is car.speed (cruise) but clipped by allowedMaxProg distance
+			// compute desired velocity
             float desiredVel = car.speed;
             float distToAllowedEnd = (allowedMaxProg - myProg) * segLen;
             if (distToAllowedEnd < 0) distToAllowedEnd = 0;
@@ -334,7 +444,7 @@ void Car::update(std::vector<Car>& cars,
                 desiredVel = 0.f;
             }
 
-            // accelerate or decelerate towards desiredVel
+			// accelerate or decelerate towards desiredVel
             if (car.velocity < desiredVel) {
                 car.velocity += car.accel * dt;
                 if (car.velocity > desiredVel) car.velocity = desiredVel;
@@ -343,15 +453,14 @@ void Car::update(std::vector<Car>& cars,
                 if (car.velocity < desiredVel) car.velocity = desiredVel;
             }
 
-            // compute step from velocity
+			// compute step along edge
             float step = (car.velocity * dt) / segLen;
             float targetProg = myProg + step;
             if (targetProg > allowedMaxProg) {
-                // cannot advance fully, clamp progressive movement and reduce velocity (anticipatory braking)
+				// apply braking to avoid overshoot
                 targetProg = allowedMaxProg;
-                // reduce velocity proportionally to remaining distance
                 float remainDist = (allowedMaxProg - myProg) * segLen;
-                // simple proportional braking
+				// braking
                 float desiredV2 = std::max(0.0f, remainDist / std::max(0.0001f, t_headway));
                 if (car.velocity > desiredV2) {
                     car.velocity -= car.braking * dt;
@@ -364,7 +473,7 @@ void Car::update(std::vector<Car>& cars,
             car.progress = targetProg;
             if (car.progress >= 1.0f - 1e-5f) {
                 car.position = pb;
-                // remove occupant entry
+				// remove occupant entry
                 vec.erase(std::remove_if(vec.begin(), vec.end(), [&](const EdgeOccupant& p) { return p.id == car.id; }), vec.end());
                 if (vec.empty()) edgeOccupants.erase(k);
                 car.onEdge = false;
@@ -374,12 +483,11 @@ void Car::update(std::vector<Car>& cars,
                 // preserve velocity
             }
             else {
-                // compute position along segment
+				// compute position along edge with lane offset
                 sf::Vector2f dir = pb - pa;
                 float len = std::sqrt(dir.x * dir.x + dir.y * dir.y);
                 if (len > 1e-5f) dir /= len;
 
-                // perpendicular vector to the right side
                 sf::Vector2f right(-dir.y, dir.x);
 
                 // compute lane offset for 4 lanes: lanes centered around road center
@@ -396,10 +504,6 @@ void Car::update(std::vector<Car>& cars,
         } // end onEdge handling
     }
 }
-
-// -------------------- Bus implementation --------------------
-
-// (Bus code unchanged from previous implementation; buses still may use any lane)
 
 std::vector<Bus> Bus::initBuses(int numBuses,
     const std::vector<std::vector<Road>>& graph,
@@ -419,7 +523,7 @@ std::vector<Bus> Bus::initBuses(int numBuses,
         bus.velocity = bus.speed * 0.5f;
         bus.color = sf::Color(200, 180, 0);
 
-        // pick stopsPerBus unique stops (allow duplicates with start though)
+        // pick stopsPerBus unique stops
         bus.stops.clear();
         for (int k = 0; k < stopsPerBus; ++k) {
             int node = Utils::randint(0, numNodes - 1);
@@ -673,8 +777,10 @@ void Car::updateCars(std::vector<Car>& cars,
     float minSpacing,
     float ROAD_THICKNESS,
     const std::vector<int>& pois,
-    float poichance) {
-    Car::update(cars, graph, positions, edgeOccupants, dt, minSpacing, ROAD_THICKNESS, pois, poichance);
+    float poichance,
+    bool commuteEnabled,
+    float simTime) {
+    Car::update(cars, graph, positions, edgeOccupants, dt, minSpacing, ROAD_THICKNESS, pois, poichance, commuteEnabled, simTime);
 }
 
 // wrapper for buses

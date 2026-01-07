@@ -1,9 +1,9 @@
 #include "city.hpp"
 #include "utils.hpp"
 
-// static: generates a graph of nodes connected by roads in a rectangular grid
+// generate a grid-like city graph
 std::vector<std::vector<Road>> City::generateCityGrid(int rows, int cols) {
-    int numNodes = rows * cols;
+	int numNodes = rows * cols; // total intersections
     std::vector<std::vector<Road>> graph(numNodes);
     auto getIndex = [cols](int r, int c) { return r * cols + c; };
 
@@ -25,18 +25,18 @@ std::vector<std::vector<Road>> City::generateCityGrid(int rows, int cols) {
     return graph;
 }
 
-std::vector<Intersection> City::generateGridPositions(int rows, int cols, int width, int height) {
-    std::vector<Intersection> positions(rows * cols);
-    float xSpacing = static_cast<float>(width) / (cols + 1);
+std::vector<Intersection> City::generateGridPositions(int rows, int cols, int width, int height) { 
+    std::vector<Intersection> positions(rows * cols); 
+    float xSpacing = static_cast<float>(width) / (cols + 1); 
     float ySpacing = static_cast<float>(height) / (rows + 1);
 
-    for (int r = 0; r < rows; ++r)
+    for (int r = 0; r < rows; ++r) 
         for (int c = 0; c < cols; ++c)
             positions[r * cols + c] = { (c + 1) * xSpacing, (r + 1) * ySpacing };
     return positions;
 }
 
-// pick approximately `fraction` of nodes (min 1) as points of interest (POIs)
+// generate POIs based on fraction of total nodes
 std::vector<int> City::generatePOIs(int rows, int cols, float fraction) {
     int numNodes = rows * cols;
     int target = std::max(1, (int)std::round(numNodes * fraction));
