@@ -1,8 +1,7 @@
 #include "city.hpp"
-#include "utils.hpp"
 
-// static: generates a graph of nodes connected by roads in a rectangular grid
-std::vector<std::vector<Road>> City::generateCityGrid(int rows, int cols) {
+// generates a graph of nodes connected by roads in a rectangular grid
+std::vector<std::vector<Road>> generateCityGrid(int rows, int cols) {
     int numNodes = rows * cols;
     std::vector<std::vector<Road>> graph(numNodes);
     auto getIndex = [cols](int r, int c) { return r * cols + c; };
@@ -25,7 +24,7 @@ std::vector<std::vector<Road>> City::generateCityGrid(int rows, int cols) {
     return graph;
 }
 
-std::vector<Intersection> City::generateGridPositions(int rows, int cols, int width, int height) {
+std::vector<Intersection> generateGridPositions(int rows, int cols, int width, int height) {
     std::vector<Intersection> positions(rows * cols);
     float xSpacing = static_cast<float>(width) / (cols + 1);
     float ySpacing = static_cast<float>(height) / (rows + 1);
@@ -34,25 +33,4 @@ std::vector<Intersection> City::generateGridPositions(int rows, int cols, int wi
         for (int c = 0; c < cols; ++c)
             positions[r * cols + c] = { (c + 1) * xSpacing, (r + 1) * ySpacing };
     return positions;
-}
-
-// pick approximately `fraction` of nodes (min 1) as points of interest (POIs)
-std::vector<int> City::generatePOIs(int rows, int cols, float fraction) {
-    int numNodes = rows * cols;
-    int target = std::max(1, (int)std::round(numNodes * fraction));
-    target = std::max(1, target);
-
-    std::vector<int> indices(numNodes);
-    for (int i = 0; i < numNodes; ++i) indices[i] = i;
-    std::shuffle(indices.begin(), indices.end(), Utils::rng);
-    indices.resize(target);
-    return indices;
-}
-
-City City::createGrid(int rows, int cols, int width, int height, float poiFraction) {
-    City c;
-    c.graph = generateCityGrid(rows, cols);
-    c.positions = generateGridPositions(rows, cols, width, height);
-    c.pois = generatePOIs(rows, cols, poiFraction);
-    return c;
 }

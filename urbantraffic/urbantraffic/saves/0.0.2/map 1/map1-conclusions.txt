@@ -1,0 +1,6 @@
+Această primă simulare, testmap1.txt , care poate reprezenta un segment tipic de oraș urban, prezintă o serie de străzi principale ce tind să preia majoritatea traficului, generând blocaje semnificative. Străzile secundare, în schimb, rămân relativ libere.
+Intersecțiile majore, asemenea celor dintr-un oraș real, sunt adesea blocate din cauza traficului care folosește singura sau cea mai apropiată conexiune pentru a ajunge la nodul de destinație.
+Viteza medie a traficului în această simulare va fi mult mai mică decât în simularea default.txt, care nu generează străzi principale sau secundare, deoarece toate străzile au aceeași lungime, iar traficul are nodurile de start și final alese aleatoriu.
+
+
+În cazul fișierului default.txt, alegerea artificială a unor noduri apropiate ca puncte de START și END pentru un număr mai mare de mașini va duce la formarea de blocaje și la apariția unor străzi principale și secundare — acestea reprezentând, de fapt, cele mai scurte rute între zonele de pornire și destinație.

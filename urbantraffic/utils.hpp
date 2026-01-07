@@ -12,10 +12,12 @@ public:
     static float randfloat(float a, float b);
 
     static std::vector<std::vector<Road>> loadCityFromFile(const std::string& filename,
-        std::vector<Intersection>& positions);
+        std::vector<Intersection>& positions,
+        std::vector<int>& pois);
 
     static void saveCityToFile(const std::vector<std::vector<Road>>& graph,
         const std::vector<Intersection>& positions,
+        const std::vector<int>& pois,
         const std::string& filename);
 
     static std::vector<int> dijkstra(const std::vector<std::vector<Road>>& graph, int start, int goal);
@@ -34,12 +36,12 @@ public:
 inline int randint(int a, int b) { return Utils::randint(a, b); }
 inline float randfloat(float a, float b) { return Utils::randfloat(a, b); }
 
-inline std::vector<std::vector<Road>> loadCityFromFile(const std::string& filename, std::vector<Intersection>& positions) {
-    return Utils::loadCityFromFile(filename, positions);
+inline std::vector<std::vector<Road>> loadCityFromFile(const std::string& filename, std::vector<Intersection>& positions, std::vector<int>& pois) {
+    return Utils::loadCityFromFile(filename, positions, pois);
 }
 
-inline void saveCityToFile(const std::vector<std::vector<Road>>& graph, const std::vector<Intersection>& positions, const std::string& filename) {
-    Utils::saveCityToFile(graph, positions, filename);
+inline void saveCityToFile(const std::vector<std::vector<Road>>& graph, const std::vector<Intersection>& positions, const std::vector<int>& pois, const std::string& filename) {
+    Utils::saveCityToFile(graph, positions, pois, filename);
 }
 
 inline long long edgeKey(int a, int b) { return Utils::edgeKey(a, b); }

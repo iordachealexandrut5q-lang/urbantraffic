@@ -24,7 +24,8 @@ long long Utils::edgeKey(int a, int b) {
 }
 
 std::vector<std::vector<Road>> Utils::loadCityFromFile(const std::string& filename,
-    std::vector<Intersection>& positions) {
+    std::vector<Intersection>& positions,
+    std::vector<int>& pois) {
     std::ifstream in(filename);
     if (!in.is_open()) {
         std::cerr << "Failed to open " << filename << "\n";
@@ -33,6 +34,7 @@ std::vector<std::vector<Road>> Utils::loadCityFromFile(const std::string& filena
 
     std::vector<std::vector<Road>> graph;
     positions.clear();
+    pois.clear();
 
     std::string token;
     while (in >> token) {
@@ -53,6 +55,9 @@ std::vector<std::vector<Road>> Utils::loadCityFromFile(const std::string& filena
             graph[a].push_back({ b, 1.0, true });
             graph[b].push_back({ a, 1.0, true });
         }
+        else if (token == "POI") {
+            int id; in >> id; pois.push_back(id);
+        }
     }
 
     return graph;
@@ -60,6 +65,7 @@ std::vector<std::vector<Road>> Utils::loadCityFromFile(const std::string& filena
 
 void Utils::saveCityToFile(const std::vector<std::vector<Road>>& graph,
     const std::vector<Intersection>& positions,
+    const std::vector<int>& pois,
     const std::string& filename) {
     std::ofstream out(filename);
     if (!out.is_open()) {
@@ -74,6 +80,13 @@ void Utils::saveCityToFile(const std::vector<std::vector<Road>>& graph,
     for (size_t i = 0; i < positions.size(); ++i) {
         out << "NODE " << i << "\n";
         out << "X: " << positions[i].x << "   Y: " << positions[i].y << "\n\n";
+    }
+
+    // Write POIs
+    if (!pois.empty()) {
+        out << "=== POIS ===\n";
+        for (int p : pois) out << "POI " << p << "\n";
+        out << "\n";
     }
 
     out << "=== CONNECTIONS ===\n";
